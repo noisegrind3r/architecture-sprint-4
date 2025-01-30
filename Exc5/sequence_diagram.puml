@@ -1,0 +1,35 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Sequence.puml
+
+title Sequence Diagram: Чтение списка заказов и изменение статуса заказа Write Behind
+
+actor "Пользователь" as User
+participant "Mes Frontend" as MesFrontend
+participant "Кэш Redis" as Redis
+participant "MES API" as MesAPI
+participant "MES DB" as MesDB
+
+' операция чтения списка заказов
+User -> MesFrontend: Запрос списка заказов
+MesFrontend -> Redis: Проверка наличия данных в кэше
+alt Данные есть в кэше
+    Redis -> MesFrontend: Возврат кэшированных данных
+else Данных нет в кэше
+    MesFrontend -> MesAPI: Запрос списка заказов
+    MesAPI -> MesDB: Запрос данных о заказах
+    MesDB -> MesAPI: Возврат данных
+    MesAPI -> Redis: Сохранение данных в кэше
+    MesAPI -> MesFrontend: Возврат данных
+end
+MesFrontend -> User: Отображение списка заказов
+
+' запись об изменении статуса заказа
+User -> MesFrontend: Запрос на изменение статуса заказа
+MesFrontend -> MesAPI: Запрос на изменение статуса
+MesAPI -> Redis: Запись нового статуса в кэш
+Redis -> MesFrontend: Подтверждение записи в кэш
+MesFrontend -> User: Уведомление об успешном изменении статуса
+Redis --> MesAPI: Асинхронная запись изменения статуса
+MesAPI -> MesDB: Асинхронное обновление статуса в БД
+
+@enduml
